@@ -1,7 +1,9 @@
 <?php namespace Gloudemans\Shoppingcart;
 
-use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Collection;
+use Config;
+use Auth;
+use DB;
 
 class Cart {
 
@@ -43,14 +45,15 @@ class Cart {
 	/**
 	 * Constructor
 	 *
-	 * @param Illuminate\Session\SessionManager                                                             $session Session class instance
-	 * @param \Illuminate\Contracts\Events\Dispatcher $event Event class instance
+	 * @param Illuminate\Session\SessionManager  $session  Session class instance
+	 * @param Illuminate\Events\Dispatcher       $event    Event class instance
 	 */
-	public function __construct($session, Dispatcher $event)
+	public function __construct($session, $event)
 	{
 		$this->session = $session;
 		$this->event = $event;
-
+		$this->table = Config::get('database.cart_table');
+		$this->userfield = Config::get('database.cart_userid');
 		$this->instance = 'main';
 	}
 
@@ -97,7 +100,7 @@ class Cart {
 	 * @param float  	    $price    Price of one item
 	 * @param array  	    $options  Array of additional options, such as 'size' or 'color'
 	 */
-	public function add($id, $name = null, $qty = null, $price = null, array $options = [])
+	public function add($id, $name = null, $qty = null, $price = null, array $options = array())
 	{
 		// If the first parameter is an array we need to call the add() function again
 		if(is_array($id))
@@ -111,7 +114,7 @@ class Cart {
 
 				foreach($id as $item)
 				{
-					$options = array_get($item, 'options', []);
+					$options = array_get($item, 'options', array());
 					$this->addRow($item['id'], $item['name'], $item['qty'], $item['price'], $options);
 				}
 
@@ -121,15 +124,15 @@ class Cart {
 				return;
 			}
 
-			$options = array_get($id, 'options', []);
+			$options = array_get($id, 'options', array());
 
 			// Fire the cart.add event
-			$this->event->fire('cart.add', array_merge($id, ['options' => $options]));
+			$this->event->fire('cart.add', array_merge($id, array('options' => $options)));
 
 			$result = $this->addRow($id['id'], $id['name'], $id['qty'], $id['price'], $options);
 
 			// Fire the cart.added event
-			$this->event->fire('cart.added', array_merge($id, ['options' => $options]));
+			$this->event->fire('cart.added', array_merge($id, array('options' => $options)));
 
 			return $result;
 		}
@@ -171,7 +174,7 @@ class Cart {
 
 		// Fire the cart.update event
 		$this->event->fire('cart.update', $rowId);
-
+		
 		$result = $this->updateQty($rowId, $attribute);
 
 		// Fire the cart.updated event
@@ -326,7 +329,7 @@ class Cart {
 	 * @param float   $price    Price of one item
 	 * @param array   $options  Array of additional options, such as 'size' or 'color'
 	 */
-	protected function addRow($id, $name, $qty, $price, array $options = [])
+	protected function addRow($id, $name, $qty, $price, array $options = array())
 	{
 		if(empty($id) || empty($name) || empty($qty) || ! isset($price))
 		{
@@ -350,7 +353,7 @@ class Cart {
 		if($cart->has($rowId))
 		{
 			$row = $cart->get($rowId);
-			$cart = $this->updateRow($rowId, ['qty' => $row->qty + $qty]);
+			$cart = $this->updateRow($rowId, array('qty' => $row->qty + $qty));
 		}
 		else
 		{
@@ -393,6 +396,11 @@ class Cart {
 	 */
 	protected function updateCart($cart)
 	{
+		if(!empty($this->table) && !empty($this->userfield) && Auth::check()){
+			$cartObject = base64_encode(serialize($cart));
+			DB::table($this->table)->where('user_id', Auth::user()->getAttribute($this->userfield))->update(['cart_object' => $cartObject]);
+			return $cart;
+		}
 		return $this->session->put($this->getInstance(), $cart);
 	}
 
@@ -403,8 +411,21 @@ class Cart {
 	 */
 	protected function getContent()
 	{
-		$content = ($this->session->has($this->getInstance())) ? $this->session->get($this->getInstance()) : new CartCollection;
-
+		if(!empty($this->table) && !empty($this->userfield) && Auth::check()){
+			$cartObject = DB::table($this->table)->where('user_id',Auth::user()->getAttribute($this->userfield))->first();
+			if(empty($cartObject)){
+				DB::table($this->table)->insert(['user_id' => Auth::user()->getAttribute($this->userfield)]);
+				$content = new CartCollection;
+			}
+			else{
+				$content = unserialize(base64_decode($cartObject->cart_object));
+				if(empty($content))
+					$content = new CartCollection;
+			}
+		}
+		else{
+			$content = ($this->session->has($this->getInstance())) ? $this->session->get($this->getInstance()) : new CartCollection;
+		}
 		return $content;
 	}
 
@@ -444,7 +465,7 @@ class Cart {
 			}
 		}
 
-		if( ! is_null(array_keys($attributes, ['qty', 'price'])))
+		if( ! is_null(array_keys($attributes, array('qty', 'price'))))
 		{
 			$row->put('subtotal', $row->qty * $row->price);
 		}
@@ -469,7 +490,7 @@ class Cart {
 	{
 		$cart = $this->getContent();
 
-		$newRow = new CartRowCollection([
+		$newRow = new CartRowCollection(array(
 			'rowid' => $rowId,
 			'id' => $id,
 			'name' => $name,
@@ -477,7 +498,7 @@ class Cart {
 			'price' => $price,
 			'options' => new CartRowOptionsCollection($options),
 			'subtotal' => $qty * $price
-		], $this->associatedModel, $this->associatedModelNamespace);
+		), $this->associatedModel, $this->associatedModelNamespace);
 
 		$cart->put($rowId, $newRow);
 
@@ -498,7 +519,7 @@ class Cart {
 			return $this->remove($rowId);
 		}
 
-		return $this->updateRow($rowId, ['qty' => $qty]);
+		return $this->updateRow($rowId, array('qty' => $qty));
 	}
 
 	/**
