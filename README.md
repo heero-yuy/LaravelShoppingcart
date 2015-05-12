@@ -12,8 +12,8 @@ Install the package through [Composer](http://getcomposer.org/). Edit your proje
 
 ```php
 "require": {
-	"laravel/framework": "4.2.*",
-	"gloudemans/shoppingcart": "~1.2"
+  "laravel/framework": "4.2.*",
+  "gloudemans/shoppingcart": "~1.2"
 }
 ```
 
@@ -21,8 +21,8 @@ Install the package through [Composer](http://getcomposer.org/). Edit your proje
 
 ```php
 "require": {
-	"laravel/framework": "5.0.*",
-	"gloudemans/shoppingcart": "dev-master"
+  "laravel/framework": "5.0.*",
+  "gloudemans/shoppingcart": "dev-master"
 }
 ```
 
@@ -34,17 +34,18 @@ Now all you have to do is add the service provider of the package and alias the 
 
 Add a new line to the `service providers` array:
 
-	'Gloudemans\Shoppingcart\ShoppingcartServiceProvider'
+  'Gloudemans\Shoppingcart\ShoppingcartServiceProvider'
 
 And finally add a new line to the `aliases` array:
 
-	'Cart'            => 'Gloudemans\Shoppingcart\Facades\Cart',
+  'Cart'            => 'Gloudemans\Shoppingcart\Facades\Cart',
 
 Now you're ready to start using the shoppingcart in your application.
 
 ## Overview
 Look at one of the following topics to learn more about LaravelShoppingcart
 
+* Changes from LaravelShoppingCart
 * [Usage](#usage)
 * [Collections](#collections)
 * [Instances](#instances)
@@ -52,6 +53,27 @@ Look at one of the following topics to learn more about LaravelShoppingcart
 * [Exceptions](#exceptions)
 * [Events](#events)
 * [Example](#example)
+
+## Changes from the original LaravelShoppingCart Package
+
+Gloudemans' LaravelShoppingCart used Laravel's Session Manager to save the cart throughout the user session. This fork allows you to use
+ a database table to store the cart instead by serializing the cart object into the table associated with a user field (i.e. username, email). 
+
+You need to add the following values to your `database.php` for your configurations to enable this feature as follows:
+
+```php
+"cart_table" => "<Name of the table in your database>",
+
+"cart_userfield" => "<Name of the field in your user table you wish to use to associate the cart object with>",
+
+"cart_field" => "<Name of the field in <cart_table> to store the cart object in>"
+```
+The cart table must have the fields chosen for `cart_userfield` and `cart_field` defined in it. `cart_field` should be defined as `Binary` or `nvarchar(max)` to make sure it will fit 
+the size of the cart object and without any encoding issues.
+
+You can then use all of the package's normal functions with the added bonus that the cart will stick to the current user even if he/she logs out! 
+
+If you'd prefer not to use the database storage feature, you can simply not define the `cart_table` attribute in your `database.php` and the package will revert to Session storage.
 
 ## Usage
 
@@ -254,7 +276,7 @@ $content = Cart::content();
 
 foreach($content as $row)
 {
-	echo 'You have ' . $row->qty . ' items of ' . $row->product->name . ' with description: "' . $row->product->description . '" in your cart.';
+  echo 'You have ' . $row->qty . ' items of ' . $row->product->name . ' with description: "' . $row->product->description . '" in your cart.';
 }
 ```
 
@@ -298,31 +320,32 @@ Cart::add('1239ad0', 'Product 2', 2, 5.95, array('size' => 'large'));
 // View
 
 <table>
-   	<thead>
-       	<tr>
-           	<th>Product</th>
-           	<th>Qty</th>
-           	<th>Item Price</th>
-           	<th>Subtotal</th>
-       	</tr>
-   	</thead>
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Item Price</th>
+            <th>Subtotal</th>
+        </tr>
+    </thead>
 
-   	<tbody>
+    <tbody>
 
-   	<?php foreach($cart as $row) :?>
+    <?php foreach($cart as $row) :?>
 
-       	<tr>
-           	<td>
-               	<p><strong><?php echo $row->name;?></strong></p>
-               	<p><?php echo ($row->options->has('size') ? $row->options->size : '');?></p>
-           	</td>
-           	<td><input type="text" value="<?php echo $row->qty;?>"></td>
-           	<td>$<?php echo $row->price;?></td>
-           	<td>$<?php echo $row->subtotal;?></td>
+        <tr>
+            <td>
+                <p><strong><?php echo $row->name;?></strong></p>
+                <p><?php echo ($row->options->has('size') ? $row->options->size : '');?></p>
+            </td>
+            <td><input type="text" value="<?php echo $row->qty;?>"></td>
+            <td>$<?php echo $row->price;?></td>
+            <td>$<?php echo $row->subtotal;?></td>
        </tr>
 
-   	<?php endforeach;?>
+    <?php endforeach;?>
 
-   	</tbody>
+    </tbody>
 </table>
 ```
+

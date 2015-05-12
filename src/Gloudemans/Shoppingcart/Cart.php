@@ -43,6 +43,24 @@ class Cart {
 	protected $associatedModelNamespace;
 
 	/**
+	 * Table name used to store the cart object.
+	 * @var string
+	 */
+	protected $table;
+
+	/**
+	 * User table field to use to associate the cart object with.
+	 * @var string
+	 */
+	protected $userfield;
+
+	/**
+	 * Cart table field to store serialized cart object in.
+	 * @var string
+	 */
+	protected $cartfield
+
+	/**
 	 * Constructor
 	 *
 	 * @param Illuminate\Session\SessionManager  $session  Session class instance
@@ -53,7 +71,8 @@ class Cart {
 		$this->session = $session;
 		$this->event = $event;
 		$this->table = Config::get('database.cart_table');
-		$this->userfield = Config::get('database.cart_userid');
+		$this->userfield = Config::get('database.cart_userfield');
+		$this->cartfield = Config::get('database.cart_field');
 		$this->instance = 'main';
 	}
 
@@ -174,7 +193,7 @@ class Cart {
 
 		// Fire the cart.update event
 		$this->event->fire('cart.update', $rowId);
-		
+
 		$result = $this->updateQty($rowId, $attribute);
 
 		// Fire the cart.updated event
@@ -398,7 +417,7 @@ class Cart {
 	{
 		if(!empty($this->table) && !empty($this->userfield) && Auth::check()){
 			$cartObject = base64_encode(serialize($cart));
-			DB::table($this->table)->where('user_id', Auth::user()->getAttribute($this->userfield))->update(['cart_object' => $cartObject]);
+			DB::table($this->table)->where($this->userfield, Auth::user()->getAttribute($this->userfield))->update([$this->cartfield => $cartObject]);
 			return $cart;
 		}
 		return $this->session->put($this->getInstance(), $cart);
@@ -412,9 +431,9 @@ class Cart {
 	protected function getContent()
 	{
 		if(!empty($this->table) && !empty($this->userfield) && Auth::check()){
-			$cartObject = DB::table($this->table)->where('user_id',Auth::user()->getAttribute($this->userfield))->first();
+			$cartObject = DB::table($this->table)->where($this->userfield,Auth::user()->getAttribute($this->userfield))->first();
 			if(empty($cartObject)){
-				DB::table($this->table)->insert(['user_id' => Auth::user()->getAttribute($this->userfield)]);
+				DB::table($this->table)->insert([$this->userfield => Auth::user()->getAttribute($this->userfield)]);
 				$content = new CartCollection;
 			}
 			else{
