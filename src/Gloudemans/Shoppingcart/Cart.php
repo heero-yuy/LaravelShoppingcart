@@ -199,6 +199,7 @@ class Cart {
 		// Fire the cart.updated event
 		$this->event->fire('cart.updated', $rowId);
 
+		$this->updateCart($result);
 		return $result;
 	}
 
