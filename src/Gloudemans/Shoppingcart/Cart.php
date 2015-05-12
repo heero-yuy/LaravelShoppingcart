@@ -58,7 +58,7 @@ class Cart {
 	 * Cart table field to store serialized cart object in.
 	 * @var string
 	 */
-	protected $cartfield
+	protected $cartfield;
 
 	/**
 	 * Constructor
