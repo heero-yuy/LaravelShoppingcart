@@ -4,6 +4,7 @@ use Illuminate\Support\Collection;
 use Config;
 use Auth;
 use DB;
+use Log;
 
 class Cart {
 
@@ -61,6 +62,12 @@ class Cart {
 	protected $cartfield;
 
 	/**
+	 * Cart table field to store a net total (optional)
+	 * @var string
+	 */
+	protected $nettotalfield;
+
+	/**
 	 * Constructor
 	 *
 	 * @param Illuminate\Session\SessionManager  $session  Session class instance
@@ -73,6 +80,7 @@ class Cart {
 		$this->table = Config::get('database.cart_table');
 		$this->userfield = Config::get('database.cart_userfield');
 		$this->cartfield = Config::get('database.cart_field');
+		$this->nettotalfield = Config::get('database.cart_nettotalfield');
 		$this->instance = 'main';
 	}
 
@@ -195,11 +203,11 @@ class Cart {
 		$this->event->fire('cart.update', $rowId);
 
 		$result = $this->updateQty($rowId, $attribute);
+		$this->updateCart($result);
 
 		// Fire the cart.updated event
 		$this->event->fire('cart.updated', $rowId);
 
-		$this->updateCart($result);
 		return $result;
 	}
 
@@ -262,6 +270,7 @@ class Cart {
 		$this->event->fire('cart.destroy');
 
 		$result = $this->updateCart(NULL);
+		$this->netTotal(0);
 
 		// Fire the cart.destroyed event
 		$this->event->fire('cart.destroyed');
@@ -277,19 +286,36 @@ class Cart {
 	public function total()
 	{
 		$total = 0;
-		$cart = $this->getContent();
 
+		$cart = $this->getContent();
 		if(empty($cart))
-		{
 			return $total;
-		}
 
 		foreach($cart AS $row)
-		{
 			$total += $row->subtotal;
-		}
 
 		return $total;
+	}
+
+	/**
+	 * Set or get net total for the stored cart.
+	 * 
+	 * @return string
+	 */
+	public function netTotal($total=null){
+		if(!empty($this->table) && !empty($this->nettotalfield))
+			if($total === null){
+				$cartObject = DB::table($this->table)->where($this->userfield,Auth::user()->getAttribute($this->userfield))->first();
+				if(!empty($cartObject) && !empty($cartObject->{$this->nettotalfield}))
+					return floatval($cartObject->{$this->nettotalfield});
+				else
+					return 0.0;
+			}
+			else {
+				DB::table($this->table)->where($this->userfield, Auth::user()->getAttribute($this->userfield))->update([$this->nettotalfield => $total]);
+				return floatval($total);
+			}
+		return 0.0;
 	}
 
 	/**
@@ -434,11 +460,11 @@ class Cart {
 		if(!empty($this->table) && !empty($this->userfield) && Auth::check()){
 			$cartObject = DB::table($this->table)->where($this->userfield,Auth::user()->getAttribute($this->userfield))->first();
 			if(empty($cartObject)){
-				DB::table($this->table)->insert([$this->userfield => Auth::user()->getAttribute($this->userfield)]);
 				$content = new CartCollection;
+				DB::table($this->table)->insert([$this->userfield => Auth::user()->getAttribute($this->userfield) , $this->cartfield => base64_encode(serialize($content))]);
 			}
 			else{
-				$content = unserialize(base64_decode($cartObject->cart_object));
+				$content = unserialize(base64_decode($cartObject->{$this->cartfield}));
 				if(empty($content))
 					$content = new CartCollection;
 			}

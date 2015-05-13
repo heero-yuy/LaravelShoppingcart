@@ -75,6 +75,32 @@ You can then use all of the package's normal functions with the added bonus that
 
 If you'd prefer not to use the database storage feature, you can simply not define the `cart_table` attribute in your `database.php` and the package will revert to Session storage.
 
+### Net total
+
+Sometimes you may wish to add your own calculations to the total as the cart changes and reduce the overhead on the database every time you need to do 
+these calculations, in this case, the cart table can have a third net total field of your choosing that will be saved and loaded as follows:
+
+```php
+/**
+ * Calculate discounts and taxes according to your own routines and save it to the 
+ * database...
+ */
+ $cart = Cart::content();
+ $netTotal = Cart::total() - calculateDiscount($cart) + calculateTax($cart);
+ Cart::netTotal($netTotal);
+
+ /**
+  * Somewhere in your view or your application, get it back whenever you need it without calculating it again.
+  */
+ $netTotal = Cart::netTotal();
+```
+
+You may specify the name of the field in your `database.php`:
+```php
+  'cart_nettotalfield' => '<The name of your net total field>'
+```
+You use this along with listening to cart events to execute your routines to update netTotal whenever you like instead of having it calculated each and every time the cart is fetched from the database for better performance.
+
 ## Usage
 
 The shoppingcart gives you the following methods to use:
@@ -301,11 +327,13 @@ The cart also has events build in. There are five events available for you to li
 
 | Event                | Fired                                   |
 | -------------------- | --------------------------------------- |
-| cart.add($item)      | When a single item is added             |
-| cart.batch($items)   | When a batch of items is added          |
-| cart.update($rowId)  | When an item in the cart is updated     |
-| cart.remove($rowId)  | When an item is removed from the cart   |
-| cart.destroy()       | When the cart is destroyed              |
+| `cart.add($item)`      | When a single item is about to be added             |
+| `cart.batch($items)`   | When a batch of items is about to be added          |
+| `cart.update($rowId)`  | When an item in the cart is about to be updated     |
+| `cart.remove($rowId)`  | When an item is about to be removed from the cart   |
+| `cart.destroy() `      | When the cart is about to be destroyed              |
+
+There are another five events that follow the above events in past tense (i.e. `cart.added`,`cart.update`) that fire after the operation is completed. (i.e. After a row was added, after a row was updated)
 
 ## Example
 
